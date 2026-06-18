@@ -1,0 +1,45 @@
+wget https://github.com/DominicBreuker/pspy/releases/latest/download/pspy64
+
+https://github.com/tomnomnom/waybackurls
+https://archive.org/web/ 
+------------------------------------------------------------------------------------------
+LINKS
+------------------------------------------------------------------------------------------
+https://www.exploit-db.com/ - CVE database with downloads
+https://pentestmonkey.net/ - Massice cheatsheet, reverse shells, john, sql injcetion, ect
+https://en.wikipedia.org/wiki/List_of_file_signatures - HEX file signatures
+https://www.shodan.io/ - search engine for Internet-connected devices
+
+------------------------------------------------------------------------------------------
+privilege escalation
+------------------------------------------------------------------------------------------
+https://gtfobins.org/ 
+wget https://github.com/DominicBreuker/pspy/releases/latest/download/pspy64
+
+------------------------------------------------------------------------------------------
+Decode/Encode + Hashes
+------------------------------------------------------------------------------------------
+https://quipqiup.com/ - Brute force cryptogram solver
+https://www.jwt.io/ - decode json web tokens 
+https://gchq.github.io/CyberChef/ - tool used to decode, analyze, and transform data.
+https://hashes.com/en/decrypt/hash - find known plaintext values for given hashes using a prebuilt database.
+https://crackstation.net/ - tool that tries to recover plaintext passwords from hashes using large precomputed databases.
+
+
+------------------------------------------------------------------------------------------
+RCE
+------------------------------------------------------------------------------------------
+https://www.revshells.com/ - tool that generates reverse shell payloads
+https://raw.githubusercontent.com/pentestmonkey/php-reverse-shell/master/php-reverse-shell.php
+
+------------------------------------------------------------------------------------------
+API CHECKER
+------------------------------------------------------------------------------------------
+https://reqbin.com/
+https://chromewebstore.google.com/detail/talend-api-tester-free-ed/aejoelaoggembcahagimdiliamlcdmfm?pli=1
+
+
+------------------------------------------------------------------------------------------
+Passwords/login lists
+------------------------------------------------------------------------------------------
+https://github.com/danielmiessler/SecLists/blob/master/Passwords/Common-Credentials/500-worst-passwords.txt
