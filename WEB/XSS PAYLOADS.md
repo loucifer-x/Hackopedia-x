@@ -1,7 +1,6 @@
 # XSS PAYLOADS
--
 
-## Auto-Triggered 
+-
 
 # XSS HTML Element Reference
 
