@@ -6,8 +6,8 @@ It is designed to educate me and provide structured knowledge for my AI assistan
 
 DIRECTORY
 -
--  [WEB](https://github.com/loucifer-x/Hackopedia-x/tree/main/WEB)
--  [PENTESTING TOOLS](https://github.com/loucifer-x/Hackopedia-x/tree/main/PENTESTING%20TOOLS)
+[WEB](https://github.com/loucifer-x/Hackopedia-x/tree/main/WEB)
+[PENTESTING TOOLS](https://github.com/loucifer-x/Hackopedia-x/tree/main/PENTESTING%20TOOLS)
 
 DISCLAIMER
 -
