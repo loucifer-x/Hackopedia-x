@@ -1,10 +1,13 @@
 HACKOPEDIA-X
 -
+HACKOPEDIA-X is my personal cybersecurity knowledge base, built to document and organize everything I learn throughout my cybersecurity journey.
 
+It is designed to educate me and provide structured knowledge for my AI assistant, helping it understand security concepts, tools, vulnerabilities.
 
 DIRECTORY
 -
-
+-  [WEB](https://github.com/loucifer-x/Hackopedia-x/tree/main/WEB)
+-  [PENTESTING TOOLS](https://github.com/loucifer-x/Hackopedia-x/tree/main/PENTESTING%20TOOLS)
 
 DISCLAIMER
 -
