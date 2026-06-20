@@ -154,7 +154,41 @@ docker run -v /:/mnt --rm -it alpine chroot /mnt sh
 tar czf backup.tar.gz --checkpoint=1 --checkpoint-action=exec=/bin/sh *
 ```
 
-## Tooling Note
+## What To Look For & Next Steps
+
+### Enumeration output
+
+| You ran | Look for | Do next |
+|---|---|---|
+| `uname -a` / `cat /etc/os-release` | Outdated kernel/distro version | Cross-reference against known CVEs (Dirty Pipe, Dirty COW, PwnKit, etc.) before trying anything riskier |
+| `sudo -l` | Any binary listed, especially `(ALL)` or `(root)` with `NOPASSWD` | Check the binary on GTFOBins — if listed, you likely have an immediate path to a root shell |
+| `find / -perm -4000 ...` (SUID) | Non-default binaries (anything beyond the standard `passwd`, `su`, `mount` set) | Check each unusual hit against GTFOBins; if not listed, manually test if it reads/writes files as root that you control |
+| `getcap -r /` | Binaries with `cap_setuid`, `cap_setgid`, `cap_dac_override` | These usually mean instant escalation — test the GTFOBins capability technique directly |
+| `crontab -l` / `/etc/crontab` | Jobs pointing to scripts in writable locations (`/tmp`, `/home/user`, world-writable dirs) | Confirm write access (`ls -la` on the target file), then overwrite with a payload and wait for the next run |
+| `ps aux` | Root processes invoking scripts/binaries by relative path or from a writable directory | Check if you can write to that path/binary — classic PATH or relative-path hijack |
+| `cat ~/.bash_history` | Plaintext passwords, internal hostnames, sudo commands run before | Reuse credentials directly; note any internal services mentioned for pivoting |
+| `~/.ssh/` contents | Private keys (`id_rsa`), `authorized_keys` you can append to | Try the key against other accounts/hosts; append your own pubkey to `authorized_keys` if writable for persistence |
+| `cat /etc/passwd` | Any unusual UID-0 entries, or whether the file itself is writable | Writable file = direct root user creation; unusual entries may indicate existing backdoors worth noting |
+| `netstat -tulpn` | Internal-only services (bound to 127.0.0.1 or internal IP) not exposed externally | Potential pivot/lateral movement targets once you have a foothold |
+| `find / -name "*config*" ...` | DB connection strings, API keys, hardcoded credentials | Test credentials against other services (DB, admin panels, other hosts) — credential reuse is common |
+
+### After a successful escalation technique
+
+| Technique used | What to verify | Then |
+|---|---|---|
+| Sudo/SUID GTFOBins shell | Run `id` to confirm `uid=0(root)` | Stabilize the shell (`python3 -c 'import pty;pty.spawn("/bin/bash")'`), then proceed to persistence/looting |
+| Cron job overwrite | Confirm payload executed (check `id` output written to a file, or catch a reverse shell) | Clean up planted files if required by ROE; document exact timing/script path for the report |
+| Kernel exploit | Confirm root **and** check system stability — kernel exploits can crash the box | Take a stability note for the report; avoid running it again on shared/production systems without explicit sign-off |
+| `/etc/passwd` write | `su` to the new user and confirm `id` shows `uid=0` | Document the write primitive that allowed the file edit — that's the real root cause, not the technique itself |
+| Docker/LXD group escape | Confirm `id` inside the chroot/container shows root **on the host**, not just inside the container | Note this is a host-level compromise — escalate severity accordingly in the report |
+| NFS no_root_squash | Confirm the SUID binary created remotely executes as root locally | Document both the misconfigured export and the missing `root_squash` setting as separate findings |
+
+### General signal-reading tips
+- A command returning **"Permission denied" on almost everything** usually means standard checks won't work — pivot to looking for misconfigurations (writable files, cron, SUID) rather than direct access.
+- Anything that runs **as root but is writable by you** is the pattern to hunt for across every category above (scripts, binaries, libraries, cron files, sudoers entries).
+- If multiple low-confidence leads turn up, prioritize **sudo/SUID/capabilities first** — fastest, least destructive, easiest to verify cleanly before considering a kernel exploit.
+
+
 Manual enumeration builds understanding of the target, but automate the sweep with `LinPEAS`, `linux-exploit-suggester`, or `linux-smart-enumeration` to catch what manual checks miss. Cross-reference any identified SUID/sudo binary against [GTFOBins](https://gtfobins.github.io) before assuming it's exploitable — exact flags/behavior vary by binary version. Stay within authorized scope — kernel exploits and `/etc/passwd` writes can crash or lock out a shared system.
 
 ## Quick Notes
