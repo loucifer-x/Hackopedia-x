@@ -1,4 +1,4 @@
-# HTTP Headers Reference — Red Team Edition
+# HTTP Headers Reference
 
 ## Request Headers (sent by client)
 
