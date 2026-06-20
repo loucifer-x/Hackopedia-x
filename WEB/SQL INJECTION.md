@@ -1,4 +1,4 @@
-# SQL Injection Reference — Red Team Edition [SQL](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/SQL%20Injection)
+# SQL Injection Reference —  [SQL](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/SQL%20Injection)
 
 
 
