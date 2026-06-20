@@ -6,5 +6,5 @@ LFI is commonly associated with dynamic file-loading functionality such as templ
 
 
 
-#PAYLOADS
+# PAYLOADS
 [PAYLOADS](https://raw.githubusercontent.com/emadshanab/LFI-Payload-List/master/LFI%20payloads.txt)
