@@ -1,6 +1,5 @@
 # XSS PAYLOADS
 
--
 # JavaScript XSS Reference
 
 ## Execution
