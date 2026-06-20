@@ -1,24 +1,6 @@
-# SQL Injection Reference — Red Team Edition
+# SQL Injection Reference — Red Team Edition [SQL](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/SQL%20Injection)
 
-## Injection Types
 
-| Type | What it does | Red team relevance |
-|---|---|---|
-| **In-band (Union-based)** | Attacker retrieves data directly in the same response via `UNION SELECT` | Fastest to confirm and extract data — start here when output is visible |
-| **In-band (Error-based)** | Forces the DB to throw an error that leaks data in the error message | Useful when the app reflects DB errors; relies on verbose error output |
-| **Blind — Boolean-based** | No data returned, but page behavior differs (content/length) based on true/false condition | Slower but works when output and errors are both suppressed |
-| **Blind — Time-based** | No visible difference at all; infer data via induced response delays (`SLEEP()`, `WAITFOR DELAY`) | Last resort when everything else is silent — reliable but slow, automate it |
-| **Out-of-band (OOB)** | Exfiltrates data via a side channel — DNS lookup, HTTP request to attacker-controlled server | Useful when in-band/blind are blocked by network egress restrictions on the app, or when you need fast confirmation without timing noise |
-| **Second-order** | Payload stored now, executes later when pulled into another unsanitized query | Easy to miss in testing — check stored data (profile fields, filenames) that get reused elsewhere |
-
-## Confirming Injection (Payload → Response)
-
-**Payload sent:**
-```
-' OR '1'='1
-```
-**Response observed:**
-If the query becomes something like `WHERE username='' OR '1'='1'`, the condition is always true — expect to see all rows returned (e.g. every user account) instead of the single expected match, or a login bypass on an auth form.
 
 ---
 
