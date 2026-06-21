@@ -1,7 +1,11 @@
 # SSRF GOPHER TUNNELING PROXY
+
 This script sets up a local TCP listener that wraps raw incoming data into a `gopher://` URL, double URL-encodes it, and forwards it as a `url` parameter to a vulnerable endpoint (`preview.php`) on a target with an SSRF flaw. This lets a tool that normally speaks plain TCP (e.g. a database or internal service client) have its traffic relayed through the SSRF endpoint to an otherwise unreachable internal host/port.
+
 ---
+
 Accepts a raw TCP connection locally, wraps the received bytes into `gopher://{phost}:{pport}/_{double_encoded_data}`, requests `http://{target}/preview.php?url=...`, and returns the response back over the original connection.
+
 ---
 ### Script:
 ```python
