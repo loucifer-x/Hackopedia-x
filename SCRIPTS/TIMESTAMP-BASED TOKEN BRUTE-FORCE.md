@@ -1,7 +1,11 @@
 # TIMESTAMP-BASED TOKEN BRUTE-FORCE
+
 This script targets a token generation scheme where the token is predictably derived from `username + unix_timestamp`. Given an approximate generation time, it brute-forces a window of nearby timestamps (300 seconds back from a given starting point) concurrently, checking each candidate token against the server until one is accepted (i.e. the response no longer contains the "invalid or expired" error).
+
 ---
+
 Builds `token = f"{username}{ts}"` for each timestamp in the search window, sends it as a GET query param, and checks if `"Invalid or expired token."` is absent from the response to confirm a valid token.
+
 ---
 ### Script:
 ```python
