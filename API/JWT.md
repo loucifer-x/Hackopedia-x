@@ -1,6 +1,8 @@
 
 # JWT (JSON WEB TOKEN) ATTACK PAYLOADS
 
+[JWT DECODER](https://www.jwt.io/)
+
 A JWT is `base64url(header).base64url(payload).base64url(signature)`. Most JWT attacks target either weak/missing signature verification, algorithm confusion, or trusting unvalidated claims — not breaking the underlying crypto itself.
 
 ## Structure Reference
