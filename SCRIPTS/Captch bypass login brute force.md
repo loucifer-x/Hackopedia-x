@@ -5,6 +5,7 @@ This script automates a browser via Selenium to attack a login form protected by
 ---
 
 For each password line from `rockyou.txt`: loads the page, OCR-solves the CAPTCHA image, fills username/password/captcha fields, submits, and checks the resulting page/URL for success vs. failure (retrying the same password on a wrong CAPTCHA read).
+
 ---
 ### Script:
 ```python
