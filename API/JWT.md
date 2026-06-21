@@ -5,11 +5,11 @@
 
 Authentication (Obtaining the Token)
 
-    - ``` curl -H 'Content-Type: application/json' -X POST -d '{ "username" : "user", "password" : "password1" }' [URL] ```
+    curl -H 'Content-Type: application/json' -X POST -d '{ "username" : "user", "password" : "password1" }' [URL]
 
 Authorization (Using the Token) 
 
-    - ``` curl -H 'Authorization: Bearer [JWT token]' [URL]?username=Y ```
+    curl -H 'Authorization: Bearer [JWT token]' [URL]?username=Y
 
 A JWT is `base64url(header).base64url(payload).base64url(signature)`. Most JWT attacks target either weak/missing signature verification, algorithm confusion, or trusting unvalidated claims — not breaking the underlying crypto itself.
 
