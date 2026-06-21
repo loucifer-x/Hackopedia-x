@@ -6,7 +6,9 @@ This is a CSRF (Cross-Site Request Forgery) proof-of-concept. When a logged-in v
 
 atob('aHR0cDovL2xvZ2luLndvcmxkd2FwLnRobS9jaGFuZ2VfcGFzc3dvcmQucGhw') Base64 encode otherwise 'http://login.worldwap.thm/change_password.php'
 
-courtesy of tryhackme:
+---
+
+### courtesy of tryhackme:
 
 ```
 <script>
