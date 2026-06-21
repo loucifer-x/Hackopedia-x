@@ -1,4 +1,5 @@
 # GRAPHQL ATTACK PAYLOADS
+[PAYLOADS](https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/GraphQL%20Injection)
 
 [GRAPHQL VOYAGER (SCHEMA VISUALIZER)](https://apis.guru/graphql-voyager/) · [GRAPHIQL](https://github.com/graphql/graphiql) · [INQL / GRAPHQL COP](https://github.com/doyensec/inql)
 
