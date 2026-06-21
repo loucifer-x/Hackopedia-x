@@ -1,6 +1,9 @@
 # CAPTCHA-BYPASS LOGIN BRUTE-FORCE (SELENIUM + OCR)
-This script automates a browser via Selenium to attack a login form protected by an image CAPTCHA. It uses stealth/anti-detection options and a randomized user agent to look like a normal browser, screenshots the CAPTCHA image element, preprocesses it (grayscale, resize, sharpen, contrast, threshold) to improve OCR accuracy, then solves it with Tesseract before submitting each login attempt from a wordlist.
+
+This script automates a browser via Selenium to attack a login form protected by an image CAPTCHA. It uses stealth/anti-detection options and a randomized user agent to look like a normal browser, screenshots the CAPTCHA image element, preprocesses it (grayscale, resize, sharpen, contrast, threshold) to improve OCR accuracy, then solves it with Tesseract before submitting each login attempt from a wordlist
+
 ---
+
 For each password line from `rockyou.txt`: loads the page, OCR-solves the CAPTCHA image, fills username/password/captcha fields, submits, and checks the resulting page/URL for success vs. failure (retrying the same password on a wrong CAPTCHA read).
 ---
 ### Script:
