@@ -1,4 +1,4 @@
-# MULTI-FORMAT TEXT ENCODER DEMO
+# XSS OBSCUTATE PAYLOAD
 This is a small interactive script that takes a single line of user input and displays it transformed through several common encoding schemes side by side: Base64, HTML entity escaping, and Python's Unicode/backslash escaping. It's a handy reference tool for quickly seeing how the same string looks once encoded in each format, e.g. for debugging, payload formatting, or learning how these encodings differ.
 
 ---
