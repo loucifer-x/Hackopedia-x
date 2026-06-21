@@ -3,7 +3,9 @@
 This script targets a login endpoint that expects RSA-encrypted (PKCS#1 v1.5), Base64-wrapped request bodies. It encrypts username/password pairs with the server's public key before sending, decrypts the JSON response with a client private key, and supports both single-credential testing and a randomized brute-force loop against a wordlist.
 
 ---
+
 Encrypts `action=login&username=...&password=...` with the server's RSA public key, POSTs it as `{"data": <b64>}`, then decrypts the returned `data` field with the client's RSA private key to read the result.
+
 ---
 ### Script:
 ```python
