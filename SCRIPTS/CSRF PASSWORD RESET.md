@@ -2,7 +2,7 @@
 
 This is a CSRF (Cross-Site Request Forgery) proof-of-concept. When a logged-in victim visits a page hosting this script, their browser automatically attaches their session cookie to a forged `POST` request, silently changing their password if the target app doesn't validate request origin or require a CSRF token.
 
--
+---
 
 atob('aHR0cDovL2xvZ2luLndvcmxkd2FwLnRobS9jaGFuZ2VfcGFzc3dvcmQucGhw') Base64 encode otherwise 'http://login.worldwap.thm/change_password.php'
 
