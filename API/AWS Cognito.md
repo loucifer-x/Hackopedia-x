@@ -1,4 +1,7 @@
-# AWS Cognito CTF Notes
+# AWS Cognito 
+
+
+### Cognito Identity Pool Misconfiguration
 
 Cognito Identity Pools can give unauthenticated users temporary AWS credentials.
 
@@ -41,6 +44,8 @@ Common vulnerability:
 * Cognito guest role has excessive permissions.
 * Client-side IDs (`localStorage`, parameters) are trusted.
 * DynamoDB allows reading more data than intended.
+
+---
 
 Remember:
 
