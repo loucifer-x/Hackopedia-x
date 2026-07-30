@@ -45,8 +45,10 @@ Common vulnerability:
 * Client-side IDs (`localStorage`, parameters) are trusted.
 * DynamoDB allows reading more data than intended.
 
----
-
 Remember:
 
 **The credentials are not the vulnerability — the IAM permissions are.**
+
+
+---
+
