@@ -23,9 +23,8 @@ Look for: `accessKeyId` - `secretAccessKey` - `sessionToken`
 export AWS_ACCESS_KEY_ID="..."
 export AWS_SECRET_ACCESS_KEY="..."
 export AWS_SESSION_TOKEN="..."
-
-aws sts get-caller-identity
 ```
+then ```aws sts get-caller-identity``` Inside console
 
 Enumerate permissions:
 
