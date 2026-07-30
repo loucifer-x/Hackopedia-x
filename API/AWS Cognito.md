@@ -1,7 +1,7 @@
 # AWS Cognito 
 
 
-### Cognito Identity Pool Misconfiguration
+## Cognito Identity Pool Misconfiguration
 
 Cognito Identity Pools can give unauthenticated users temporary AWS credentials.
 
