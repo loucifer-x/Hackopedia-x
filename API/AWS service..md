@@ -1,4 +1,5 @@
 # AWS service
+Amazon Web Services (AWS) is a cloud platform that lets people and companies use computers, storage, databases, and other tools over the internet instead of managing their own hardware. AWS provides many services that help build, run, and secure applications in the cloud.
 
 
 ## Cognito Identity Pool Misconfiguration
