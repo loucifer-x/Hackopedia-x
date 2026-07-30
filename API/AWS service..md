@@ -1,4 +1,4 @@
-# AWS Cognito 
+# AWS service
 
 
 ## Cognito Identity Pool Misconfiguration
